@@ -1,0 +1,20 @@
+﻿CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
+    instagram_sender_id VARCHAR(255),
+    instagram_recipient_id VARCHAR(255),
+    message_text TEXT,
+    message_mid VARCHAR(255),
+    event_timestamp BIGINT,
+    raw_payload JSONB NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id
+    ON messages (instagram_sender_id);
+
+CREATE INDEX IF NOT EXISTS idx_messages_event_timestamp
+    ON messages (event_timestamp DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_mid_unique
+    ON messages (message_mid)
+    WHERE message_mid IS NOT NULL;
