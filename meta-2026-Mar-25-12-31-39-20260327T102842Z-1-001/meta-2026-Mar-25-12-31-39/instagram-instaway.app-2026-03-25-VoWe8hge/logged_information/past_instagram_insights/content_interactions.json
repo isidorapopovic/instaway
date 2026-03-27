@@ -1,0 +1,87 @@
+{
+  "organic_insights_interactions": [
+    {
+      "title": "",
+      "media_map_data": {
+        
+      },
+      "string_map_data": {
+        "Date Range": {
+          "href": "",
+          "value": "Dec 25 - Mar 24",
+          "timestamp": 0
+        },
+        "Content Interactions": {
+          "href": "",
+          "value": "0",
+          "timestamp": 0
+        },
+        "Content Interactions Delta": {
+          "href": "",
+          "value": "0% vs Sep 26 - Dec 24",
+          "timestamp": 0
+        },
+        "Post Interactions": {
+          "href": "",
+          "value": "0",
+          "timestamp": 0
+        },
+        "Post Interactions Delta": {
+          "href": "",
+          "value": "0% vs Sep 26 - Dec 24",
+          "timestamp": 0
+        },
+        "Story Interactions": {
+          "href": "",
+          "value": "0",
+          "timestamp": 0
+        },
+        "Story Interactions Delta": {
+          "href": "",
+          "value": "0% vs Sep 26 - Dec 24",
+          "timestamp": 0
+        },
+        "Video Interactions": {
+          "href": "",
+          "value": "0",
+          "timestamp": 0
+        },
+        "Video Interactions Delta": {
+          "href": "",
+          "value": "0% vs Sep 26 - Dec 24",
+          "timestamp": 0
+        },
+        "Reels Interactions": {
+          "href": "",
+          "value": "0",
+          "timestamp": 0
+        },
+        "Reels Interactions Delta": {
+          "href": "",
+          "value": "0% vs Sep 26 - Dec 24",
+          "timestamp": 0
+        },
+        "Live Video Interactions": {
+          "href": "",
+          "value": "0",
+          "timestamp": 0
+        },
+        "Live Video Interactions Delta": {
+          "href": "",
+          "value": "0% vs Sep 26 - Dec 24",
+          "timestamp": 0
+        },
+        "Accounts engaged": {
+          "href": "",
+          "value": "0",
+          "timestamp": 0
+        },
+        "Accounts Engaged Delta": {
+          "href": "",
+          "value": "0% vs Sep 26 - Dec 24",
+          "timestamp": 0
+        }
+      }
+    }
+  ]
+}

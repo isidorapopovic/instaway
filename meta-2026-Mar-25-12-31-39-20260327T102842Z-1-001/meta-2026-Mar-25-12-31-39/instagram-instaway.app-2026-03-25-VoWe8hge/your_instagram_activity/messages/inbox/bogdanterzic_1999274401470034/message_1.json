@@ -1,0 +1,39 @@
+{
+  "participants": [
+    {
+      "name": "\u00d0\u0091\u00d0\u00be\u00d0\u00b3\u00d0\u00b4\u00d0\u00b0\u00d0\u00bd \u00d0\u00a2\u00d0\u00b5\u00d1\u0080\u00d0\u00b7\u00d0\u00b8\u00d1\u009b"
+    },
+    {
+      "name": "instaway"
+    }
+  ],
+  "messages": [
+    {
+      "sender_name": "instaway",
+      "timestamp_ms": 1774466952447,
+      "content": "da vidimo da li si lead",
+      "is_geoblocked_for_viewer": false,
+      "is_unsent_image_by_messenger_kid_parent": false
+    },
+    {
+      "sender_name": "instaway",
+      "timestamp_ms": 1774466948615,
+      "content": "hello",
+      "is_geoblocked_for_viewer": false,
+      "is_unsent_image_by_messenger_kid_parent": false
+    },
+    {
+      "sender_name": "\u00d0\u0091\u00d0\u00be\u00d0\u00b3\u00d0\u00b4\u00d0\u00b0\u00d0\u00bd \u00d0\u00a2\u00d0\u00b5\u00d1\u0080\u00d0\u00b7\u00d0\u00b8\u00d1\u009b",
+      "timestamp_ms": 1774466795027,
+      "content": "Hello",
+      "is_geoblocked_for_viewer": false,
+      "is_unsent_image_by_messenger_kid_parent": false
+    }
+  ],
+  "title": "\u00d0\u0091\u00d0\u00be\u00d0\u00b3\u00d0\u00b4\u00d0\u00b0\u00d0\u00bd \u00d0\u00a2\u00d0\u00b5\u00d1\u0080\u00d0\u00b7\u00d0\u00b8\u00d1\u009b",
+  "is_still_participant": true,
+  "thread_path": "inbox/bogdanterzic_1999274401470034",
+  "magic_words": [
+    
+  ]
+}

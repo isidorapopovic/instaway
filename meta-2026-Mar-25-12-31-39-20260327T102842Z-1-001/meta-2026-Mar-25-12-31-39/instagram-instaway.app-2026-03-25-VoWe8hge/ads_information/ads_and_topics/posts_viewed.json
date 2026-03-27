@@ -1,0 +1,119 @@
+[
+  {
+    "timestamp": 1774443459,
+    "media": [
+      
+    ],
+    "label_values": [
+      {
+        "label": "Ad library public URL"
+      },
+      {
+        "label": "URL",
+        "value": "https://www.instagram.com/p/DVrPYbDDrXm/",
+        "href": "https://www.instagram.com/p/DVrPYbDDrXm/"
+      },
+      {
+        "dict": [
+          {
+            "dict": [
+              {
+                "label": "URL",
+                "value": "https://www.facebook.com/share/15qByPm6ok/?mibextid=wwXIfr"
+              },
+              {
+                "label": "Name",
+                "value": "Maria Sil\u00c3\u00a9n"
+              },
+              {
+                "label": "Username",
+                "value": "mamaartphotos"
+              }
+            ],
+            "title": ""
+          }
+        ],
+        "title": "Owner"
+      }
+    ],
+    "fbid": "17841436625171470:17945793591115552:1774443459::DYIImpressionsData"
+  },
+  {
+    "timestamp": 1774463576,
+    "media": [
+      
+    ],
+    "label_values": [
+      {
+        "label": "Ad library public URL"
+      },
+      {
+        "label": "URL",
+        "value": "https://www.instagram.com/p/DVld0u9iN3K/",
+        "href": "https://www.instagram.com/p/DVld0u9iN3K/"
+      },
+      {
+        "dict": [
+          {
+            "dict": [
+              {
+                "label": "URL",
+                "value": "https://hrbl.me/CR7Pro2col"
+              },
+              {
+                "label": "Name",
+                "value": "Cristiano Ronaldo"
+              },
+              {
+                "label": "Username",
+                "value": "cristiano"
+              }
+            ],
+            "title": ""
+          }
+        ],
+        "title": "Owner"
+      }
+    ],
+    "fbid": "17841436625171470:18082040738198021:1774463576::DYIImpressionsData"
+  },
+  {
+    "timestamp": 1774464436,
+    "media": [
+      
+    ],
+    "label_values": [
+      {
+        "label": "Ad library public URL"
+      },
+      {
+        "label": "URL",
+        "value": "https://www.instagram.com/p/DWRMhClkZgg/",
+        "href": "https://www.instagram.com/p/DWRMhClkZgg/"
+      },
+      {
+        "dict": [
+          {
+            "dict": [
+              {
+                "label": "URL",
+                "value": "https://10pmcurfew.com"
+              },
+              {
+                "label": "Name",
+                "value": "Girls"
+              },
+              {
+                "label": "Username",
+                "value": "girls"
+              }
+            ],
+            "title": ""
+          }
+        ],
+        "title": "Owner"
+      }
+    ],
+    "fbid": "17841436625171470:17850538638662342:1774464436::DYIImpressionsData"
+  }
+]

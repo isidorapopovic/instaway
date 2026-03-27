@@ -1,0 +1,52 @@
+{
+  "profile_user": [
+    {
+      "title": "User Information",
+      "media_map_data": {
+        
+      },
+      "string_map_data": {
+        "Email": {
+          "href": "",
+          "value": "instaway.email@gmail.com",
+          "timestamp": 0
+        },
+        "Phone Confirmed": {
+          "href": "",
+          "value": "False",
+          "timestamp": 0
+        },
+        "Username": {
+          "href": "",
+          "value": "instaway.app",
+          "timestamp": 0
+        },
+        "Name": {
+          "href": "",
+          "value": "instaway",
+          "timestamp": 0
+        },
+        "Gender": {
+          "href": "",
+          "value": "unspecified",
+          "timestamp": 0
+        },
+        "Date of birth": {
+          "href": "",
+          "value": "2000-01-15",
+          "timestamp": 0
+        },
+        "Private Account": {
+          "href": "",
+          "value": "False",
+          "timestamp": 0
+        },
+        "Emoji Pong High Score": {
+          "href": "",
+          "value": "0",
+          "timestamp": 0
+        }
+      }
+    }
+  ]
+}

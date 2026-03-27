@@ -1,0 +1,43 @@
+{
+  "text_post_app_text_post_app_posts_seen": [
+    {
+      "string_map_data": {
+        "Author": {
+          "value": "mamaartphotos"
+        },
+        "Time": {
+          "timestamp": 1774443459
+        },
+        "URL": {
+          "href": "https://www.instagram.com/p/DVrPYbDDrXm/"
+        }
+      }
+    },
+    {
+      "string_map_data": {
+        "Author": {
+          "value": "cristiano"
+        },
+        "Time": {
+          "timestamp": 1774463576
+        },
+        "URL": {
+          "href": "https://www.instagram.com/p/DVld0u9iN3K/"
+        }
+      }
+    },
+    {
+      "string_map_data": {
+        "Author": {
+          "value": "girls"
+        },
+        "Time": {
+          "timestamp": 1774464436
+        },
+        "URL": {
+          "href": "https://www.instagram.com/p/DWRMhClkZgg/"
+        }
+      }
+    }
+  ]
+}

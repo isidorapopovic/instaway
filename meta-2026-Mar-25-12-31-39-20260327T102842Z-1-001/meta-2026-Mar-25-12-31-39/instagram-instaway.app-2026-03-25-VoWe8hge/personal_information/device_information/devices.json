@@ -1,0 +1,40 @@
+{
+  "devices_devices": [
+    {
+      "title": "",
+      "media_map_data": {
+        
+      },
+      "string_map_data": {
+        "Last Login": {
+          "href": "",
+          "value": "",
+          "timestamp": 1774463565
+        },
+        "User Agent": {
+          "href": "",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+          "timestamp": 0
+        }
+      }
+    },
+    {
+      "title": "",
+      "media_map_data": {
+        
+      },
+      "string_map_data": {
+        "Last Login": {
+          "href": "",
+          "value": "",
+          "timestamp": 1774443450
+        },
+        "User Agent": {
+          "href": "",
+          "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+          "timestamp": 0
+        }
+      }
+    }
+  ]
+}
