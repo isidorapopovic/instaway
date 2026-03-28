@@ -1,5 +1,6 @@
 const express = require('express');
 const { saveMessage } = require('../services/messageService');
+const { handleIncomingMessage } = require('../handlers/messageHandler');
 
 const router = express.Router();
 
@@ -24,6 +25,7 @@ router.get('/', (req, res) => {
     const challenge = req.query['hub.challenge'];
 
     if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
+        console.log('[webhook] Verified.');
         return res.status(200).send(challenge);
     }
 
@@ -34,6 +36,7 @@ router.post('/', async (req, res) => {
     const body = req.body;
     console.log('Incoming webhook body:', JSON.stringify(body, null, 2));
 
+    // Acknowledge immediately
     res.sendStatus(200);
 
     try {
@@ -44,24 +47,25 @@ router.post('/', async (req, res) => {
             const recipientId = event.recipient?.id || null;
             const timestamp = event.timestamp || null;
 
-            if (event.message) {
-                await saveMessage({
-                    senderId,
-                    recipientId,
-                    text: event.message.text || null,
-                    mid: event.message.mid || null,
-                    timestamp,
-                    rawPayload: event
-                });
-            } else {
-                await saveMessage({
-                    senderId,
-                    recipientId,
-                    text: null,
-                    mid: null,
-                    timestamp,
-                    rawPayload: event
-                });
+            // Skip echo messages (sent by the page itself)
+            if (event.message?.is_echo) continue;
+            if (senderId && recipientId && senderId === recipientId) continue;
+
+            // 1. Always save the raw message to the DB (existing behaviour)
+            await saveMessage({
+                senderId,
+                recipientId,
+                text: event.message?.text || null,
+                mid: event.message?.mid || null,
+                timestamp,
+                rawPayload: event
+            });
+
+            // 2. If it's a text message from a real user, run the scheduling handler
+            if (senderId && event.message?.text) {
+                handleIncomingMessage(senderId, event.message.text).catch(err =>
+                    console.error('[webhook] handleIncomingMessage error:', err.message)
+                );
             }
         }
     } catch (error) {
