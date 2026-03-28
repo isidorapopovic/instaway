@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const { saveMessage } = require('../services/messageService');
 
 const router = express.Router();
@@ -11,13 +11,8 @@ function extractMessagingEvents(body) {
     }
 
     for (const entry of body.entry) {
-        if (!Array.isArray(entry.messaging)) {
-            continue;
-        }
-
-        for (const event of entry.messaging) {
-            events.push(event);
-        }
+        if (!Array.isArray(entry.messaging)) continue;
+        for (const event of entry.messaging) events.push(event);
     }
 
     return events;
@@ -28,11 +23,7 @@ router.get('/', (req, res) => {
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    if (
-        mode === 'subscribe' &&
-        token &&
-        token === process.env.META_VERIFY_TOKEN
-    ) {
+    if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
         return res.status(200).send(challenge);
     }
 
@@ -40,11 +31,12 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', async (req, res) => {
+    const body = req.body;
+    console.log('Incoming webhook body:', JSON.stringify(body, null, 2));
+
+    res.sendStatus(200);
+
     try {
-        const body = req.body;
-
-        console.log('Incoming webhook body:', JSON.stringify(body, null, 2));
-
         const messagingEvents = extractMessagingEvents(body);
 
         for (const event of messagingEvents) {
@@ -53,27 +45,15 @@ router.post('/', async (req, res) => {
             const timestamp = event.timestamp || null;
 
             if (event.message) {
-                const text = event.message.text || null;
-                const mid = event.message.mid || null;
-
                 await saveMessage({
                     senderId,
                     recipientId,
-                    text,
-                    mid,
+                    text: event.message.text || null,
+                    mid: event.message.mid || null,
                     timestamp,
                     rawPayload: event
                 });
-
-                console.log('Saved message event:', {
-                    senderId,
-                    recipientId,
-                    text,
-                    mid,
-                    timestamp
-                });
             } else {
-                // Save non-message events as raw payload too, if you want visibility
                 await saveMessage({
                     senderId,
                     recipientId,
@@ -82,15 +62,10 @@ router.post('/', async (req, res) => {
                     timestamp,
                     rawPayload: event
                 });
-
-                console.log('Saved non-message event');
             }
         }
-
-        return res.sendStatus(200);
     } catch (error) {
         console.error('POST /webhook error:', error);
-        return res.sendStatus(500);
     }
 });
 

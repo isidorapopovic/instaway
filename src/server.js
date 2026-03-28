@@ -4,6 +4,7 @@ const webhookRouter = require('./routes/webhook');
 const messagesRouter = require('./routes/messages');
 const db = require('./db');
 const calendarRouter = require('./routes/calendar');
+const inboxRouter = require('./routes/inbox');
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.get('/', async (req, res) => {
 app.use('/webhook', webhookRouter);
 app.use('/messages', messagesRouter);
 app.use('/calendar', calendarRouter);
+app.use('/inbox', inboxRouter);
 
 app.use((req, res) => {
   return res.status(404).json({
