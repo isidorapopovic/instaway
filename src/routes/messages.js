@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const { getMessages } = require('../services/messageService');
 
 const router = express.Router();
@@ -12,9 +12,11 @@ router.get('/', async (req, res) => {
         return res.status(200).json(messages);
     } catch (error) {
         console.error('GET /messages error:', error);
-        return res.status(500).json({
-            error: 'Failed to fetch messages'
+        res.status(500).json(
+            error: 'Failed to fetch messages',
+            details: error.message
         });
+        }
     }
 });
 
