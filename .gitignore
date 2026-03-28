@@ -1,1 +1,3 @@
-﻿.vs/
+.vs/
+.env
+node_modules
