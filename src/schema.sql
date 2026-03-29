@@ -6,9 +6,6 @@ CREATE TABLE IF NOT EXISTS messages (
   message_mid TEXT UNIQUE,
   event_timestamp BIGINT,
   raw_payload JSONB,
-  sender TEXT,
-  recipient TEXT,
-  message TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
