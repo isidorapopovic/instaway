@@ -48,24 +48,41 @@ router.post('/', async (req, res) => {
             const recipientId = event.recipient?.id || null;
             const timestamp = event.timestamp || null;
 
-            if (event.message?.is_echo) continue;
-            if (senderId && recipientId && senderId === recipientId) continue;
+            if (event.message?.is_echo) {
+                console.log('[webhook] skipping echo message');
+                continue;
+            }
 
-            await saveMessage({
-                senderId,
-                recipientId,
-                text: event.message?.text || null,
-                mid: event.message?.mid || null,
-                timestamp,
-                rawPayload: event,
-            });
+            if (senderId && recipientId && senderId === recipientId) {
+                console.log('[webhook] skipping sender===recipient');
+                continue;
+            }
+
+            if (event.message) {
+                console.log('[webhook] calling saveMessage for mid:', event.message?.mid || null);
+
+                const saved = await saveMessage({
+                    senderId,
+                    recipientId,
+                    text: event.message?.text || null,
+                    mid: event.message?.mid || null,
+                    timestamp,
+                    rawPayload: event,
+                });
+
+                console.log('[webhook] saveMessage returned:', saved ? saved.id : null);
+            } else {
+                console.log('[webhook] event has no event.message, skipping saveMessage');
+            }
 
             if (senderId && event.message?.text) {
+                console.log('[webhook] calling handleIncomingMessage');
                 await handleIncomingMessage(senderId, event.message.text);
             }
         }
     } catch (error) {
-        console.error('POST /webhook error:', error);
+        console.error('POST /webhook error:', error.message);
+        console.error(error.stack);
     }
 });
 
