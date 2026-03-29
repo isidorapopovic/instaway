@@ -40,7 +40,10 @@ async function upsertConversation(userId, data) {
 }
 
 async function deleteConversation(userId) {
-    await query('DELETE FROM conversations WHERE instagram_user_id = $1', [userId]);
+    await query(
+        'DELETE FROM conversations WHERE instagram_user_id = $1',
+        [userId]
+    );
 }
 
 async function purgeStaleConversations(hours = 24) {
@@ -53,7 +56,9 @@ async function purgeStaleConversations(hours = 24) {
     );
 
     if (rowCount > 0) {
-        console.log(`[conversationState] Purged ${rowCount} stale conversation(s).`);
+        console.log(
+            `[conversationState] Purged ${rowCount} stale conversation(s).`
+        );
     }
 }
 
