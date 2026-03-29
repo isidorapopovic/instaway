@@ -25,50 +25,30 @@ async function saveMessage({
     const values = [senderId, recipientId, text, mid, timestamp, rawPayload];
 
     try {
-        console.log('[messageService] attempting insert', {
-            senderId,
-            recipientId,
-            text,
-            mid,
-            timestamp,
-        });
-
         const result = await db.query(sql, values);
-
-        if (result.rows[0]) {
-            console.log('[messageService] inserted row id:', result.rows[0].id);
-        } else {
-            console.log('[messageService] no row inserted (likely duplicate mid)');
-        }
-
+        console.log('[messageService] inserted:', result.rows[0] || null);
         return result.rows[0] || null;
     } catch (err) {
         console.error('[messageService] saveMessage failed:', err.message);
-        console.error(err.stack);
         throw err;
     }
 }
 
 async function getMessages(limit = 50) {
-    const safeLimit = Number.isInteger(limit) ? limit : 50;
-
-    const sql = `
-    SELECT
-      id,
-      instagram_sender_id,
-      instagram_recipient_id,
-      message_text,
-      message_mid,
-      event_timestamp,
-      raw_payload,
-      created_at
+    const result = await db.query(
+        `
+    SELECT *
     FROM messages
     ORDER BY created_at DESC
-    LIMIT $1;
-  `;
+    LIMIT $1
+    `,
+        [limit]
+    );
 
-    const result = await db.query(sql, [safeLimit]);
     return result.rows;
 }
 
-module.exports = { saveMessage, getMessages };
+module.exports = {
+    saveMessage,
+    getMessages,
+};
