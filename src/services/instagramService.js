@@ -4,17 +4,32 @@ const GRAPH_API_BASE = 'https://graph.facebook.com/v19.0';
 
 async function sendMessage(recipientId, text) {
     try {
-        await axios.post(
+        const token = process.env.IG_ACCESS_TOKEN;
+
+        console.log('[instagramService] token exists:', !!token);
+        console.log(
+            '[instagramService] token preview:',
+            token ? `${token.slice(0, 12)}...` : 'MISSING'
+        );
+        console.log('[instagramService] recipientId:', recipientId);
+        console.log('[instagramService] text:', text);
+
+        if (!token) {
+            throw new Error('IG_ACCESS_TOKEN is missing from environment variables');
+        }
+
+        const response = await axios.post(
             `${GRAPH_API_BASE}/me/messages`,
             {
                 recipient: { id: recipientId },
                 message: { text },
             },
             {
-                params: { access_token: process.env.IG_ACCESS_TOKEN },
+                params: { access_token: token },
             }
         );
 
+        console.log('[instagramService] Meta response:', response.data);
         console.log(`[instagramService] Sent message to ${recipientId}`);
     } catch (err) {
         const detail = err.response?.data || err.message;
