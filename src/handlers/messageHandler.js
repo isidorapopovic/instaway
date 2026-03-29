@@ -1,6 +1,3 @@
-// src/handlers/messageHandler.js
-// Detects scheduling intent in incoming DMs and drives the booking conversation.
-
 const {
     getConversation,
     upsertConversation,
@@ -11,7 +8,7 @@ const {
     getAvailableSlots,
     createBookingEvent,
     formatSlot,
-} = require('../services/googleCalendarService');   // ← matches your existing filename
+} = require('../services/googleCalendarService');
 
 const {
     sendMessage,
@@ -22,18 +19,28 @@ const {
     buildInvalidChoiceMessage,
 } = require('../services/instagramService');
 
-// ---------------------------------------------------------------------------
-// Intent detection – keyword-based
-// ---------------------------------------------------------------------------
-
 const SCHEDULING_KEYWORDS = [
-    // English
-    'book', 'booking', 'schedule', 'appointment', 'treatment',
-    'available', 'availability', 'slot', 'reserve', 'reservation',
-    'when can', 'free time', 'come in', 'visit',
-    // Serbian
-    'rezerv', 'termin', 'zakazati', 'zakazivanje', 'slobodan',
-    'tretman', 'dolazak',
+    'book',
+    'booking',
+    'schedule',
+    'appointment',
+    'treatment',
+    'available',
+    'availability',
+    'slot',
+    'reserve',
+    'reservation',
+    'when can',
+    'free time',
+    'come in',
+    'visit',
+    'rezerv',
+    'termin',
+    'zakazati',
+    'zakazivanje',
+    'slobodan',
+    'tretman',
+    'dolazak',
 ];
 
 function isSchedulingIntent(text) {
@@ -41,13 +48,12 @@ function isSchedulingIntent(text) {
     return SCHEDULING_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-// ---------------------------------------------------------------------------
-// State handlers
-// ---------------------------------------------------------------------------
-
 async function handleIdle(userId, text) {
     if (!isSchedulingIntent(text)) {
-        console.log(`[messageHandler] No scheduling intent from ${userId}.`);
+        await sendMessage(
+            userId,
+            "Hi! I can help with bookings. Send a message like 'book an appointment' or 'when is your next free slot?'."
+        );
         return;
     }
 
@@ -94,14 +100,20 @@ async function handleAwaitingName(userId, text, conversation) {
     const selectedSlot = conversation.selected_slot;
 
     if (!clientName || clientName.length < 2) {
-        await sendMessage(userId, "Could you share your full name so I can confirm the booking? 😊");
+        await sendMessage(
+            userId,
+            'Could you share your full name so I can confirm the booking?'
+        );
         return;
     }
 
     if (!selectedSlot) {
         console.error(`[messageHandler] Missing selectedSlot for ${userId}, resetting.`);
         await deleteConversation(userId);
-        await sendMessage(userId, "Something went wrong on my end. Let's start over – what treatment would you like to book?");
+        await sendMessage(
+            userId,
+            "Something went wrong on my end. Let's start over — send 'book an appointment' and I'll show you the next slots."
+        );
         return;
     }
 
@@ -117,7 +129,7 @@ async function handleAwaitingName(userId, text, conversation) {
         console.error('[messageHandler] Failed to create calendar event:', err.message);
         await sendMessage(
             userId,
-            "I'm sorry, I had trouble saving your booking right now. Please try again in a moment. 🙏"
+            "I'm sorry, I had trouble saving your booking right now. Please try again in a moment."
         );
         return;
     }
@@ -126,22 +138,24 @@ async function handleAwaitingName(userId, text, conversation) {
     await deleteConversation(userId);
 }
 
-// ---------------------------------------------------------------------------
-// Main dispatcher
-// ---------------------------------------------------------------------------
-
 async function handleIncomingMessage(userId, text) {
     if (!text || !text.trim()) return;
 
     let conversation;
+
     try {
         conversation = await getConversation(userId);
     } catch (err) {
         console.error('[messageHandler] DB error:', err.message);
+        await sendMessage(
+            userId,
+            "I'm having a temporary database issue at the moment. Please try again shortly."
+        );
         return;
     }
 
     const state = conversation?.state || 'idle';
+
     console.log(`[messageHandler] user=${userId} state=${state} text="${text.substring(0, 60)}"`);
 
     try {
@@ -149,28 +163,26 @@ async function handleIncomingMessage(userId, text) {
             case 'idle':
                 await handleIdle(userId, text);
                 break;
-
             case 'awaiting_slot_choice':
                 await handleAwaitingSlotChoice(userId, text, conversation);
                 break;
-
             case 'awaiting_name':
                 await handleAwaitingName(userId, text, conversation);
                 break;
-
-            case 'confirmed':
-                // Edge case: user messages again right after confirming
-                await deleteConversation(userId);
-                await handleIdle(userId, text);
-                break;
-
             default:
                 console.warn(`[messageHandler] Unknown state "${state}", resetting.`);
                 await deleteConversation(userId);
                 await handleIdle(userId, text);
+                break;
         }
     } catch (err) {
         console.error(`[messageHandler] Error for user ${userId}:`, err.message);
+        try {
+            await sendMessage(
+                userId,
+                "Something went wrong while processing your message. Please try again."
+            );
+        } catch (_) { }
     }
 }
 

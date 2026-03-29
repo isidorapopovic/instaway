@@ -36,7 +36,6 @@ router.get('/', (req, res) => {
 
 router.post('/', async (req, res) => {
     const body = req.body;
-
     console.log('Incoming webhook body:', JSON.stringify(body, null, 2));
 
     res.sendStatus(200);
