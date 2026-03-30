@@ -1,7 +1,8 @@
 require('dotenv').config();
+
 const express = require('express');
-const webhookRouter = require('./routes/webhook');
-const { purgeStaleConversations } = require('./db/conversationState');
+const webhookRoutes = require('./routes/webhook');
+const messagesRoutes = require('./routes/messages');
 const { initDb } = require('./db/initDb');
 
 const app = express();
@@ -9,28 +10,28 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-app.get('/', (_req, res) => {
-    res.send('instaway is running ✅');
+app.use('/webhook', webhookRoutes);
+app.use('/messages', messagesRoutes);
+
+app.get('/', (req, res) => {
+    res.send('instaway is running');
 });
-
-app.use('/webhook', webhookRouter);
-app.use(express.static('.'));
-
-setInterval(() => {
-    purgeStaleConversations(24).catch(err =>
-        console.error('[server] Purge error:', err.message)
-    );
-}, 60 * 60 * 1000);
 
 async function start() {
-    await initDb();
+    try {
+        console.log('[server] cwd =', process.cwd());
+        console.log('[server] DATABASE_URL exists =', !!process.env.DATABASE_URL);
+        console.log('[server] DATABASE_URL value =', process.env.DATABASE_URL || 'MISSING');
+        console.log('[server] PG_SSL =', process.env.PG_SSL || 'MISSING');
 
-    app.listen(PORT, () => {
-        console.log(`[server] instaway listening on port ${PORT}`);
-    });
+        await initDb();
+
+        app.listen(PORT, () => {
+            console.log(`[server] instaway listening on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error('[server] Failed to start:', error);
+    }
 }
 
-start().catch(err => {
-    console.error('[server] Failed to start:', err);
-    process.exit(1);
-});
+start();
