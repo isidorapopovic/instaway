@@ -6,8 +6,13 @@ async function saveMessage({
     text = null,
     mid = null,
     timestamp = null,
-    rawPayload,
+    rawPayload = null,
 }) {
+    if (!mid) {
+        console.warn('[messageService] Skipping insert because message_mid is missing');
+        return null;
+    }
+
     const sql = `
     INSERT INTO messages (
       instagram_sender_id,
@@ -22,12 +27,25 @@ async function saveMessage({
     RETURNING *;
   `;
 
-    const values = [senderId, recipientId, text, mid, timestamp, rawPayload];
+    const values = [
+        senderId,
+        recipientId,
+        text,
+        mid,
+        timestamp,
+        rawPayload ? JSON.stringify(rawPayload) : null,
+    ];
 
     try {
         const result = await db.query(sql, values);
-        console.log('[messageService] inserted:', result.rows[0] || null);
-        return result.rows[0] || null;
+
+        if (result.rows.length === 0) {
+            console.log('[messageService] Message already existed, nothing inserted:', mid);
+            return null;
+        }
+
+        console.log('[messageService] Inserted message row:', result.rows[0]);
+        return result.rows[0];
     } catch (err) {
         console.error('[messageService] saveMessage failed:', err.message);
         throw err;
@@ -36,15 +54,9 @@ async function saveMessage({
 
 async function getMessages(limit = 50) {
     const result = await db.query(
-        `
-    SELECT *
-    FROM messages
-    ORDER BY created_at DESC
-    LIMIT $1
-    `,
+        `SELECT * FROM messages ORDER BY created_at DESC LIMIT $1`,
         [limit]
     );
-
     return result.rows;
 }
 
