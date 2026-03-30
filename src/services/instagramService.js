@@ -18,8 +18,13 @@ async function sendMessage(recipientId, text) {
             throw new Error('IG_ACCESS_TOKEN is missing from environment variables');
         }
 
+        const igAccountId = process.env.IG_ACCOUNT_ID;
+        if (!igAccountId) {
+            throw new Error('IG_ACCOUNT_ID is missing from environment variables');
+        }
+
         const response = await axios.post(
-            `${GRAPH_API_BASE}/me/messages`,
+            `${GRAPH_API_BASE}/${igAccountId}/messages`,
             {
                 recipient: { id: recipientId },
                 message: { text },
