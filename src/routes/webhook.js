@@ -12,10 +12,7 @@ function extractMessagingEvents(body) {
     }
 
     for (const entry of body.entry) {
-        if (!Array.isArray(entry.messaging)) {
-            continue;
-        }
-
+        if (!Array.isArray(entry.messaging)) continue;
         for (const event of entry.messaging) {
             events.push(event);
         }
@@ -40,9 +37,7 @@ router.get('/', (req, res) => {
 router.post('/', async (req, res) => {
     const body = req.body;
 
-    console.log('[webhook] Incoming webhook body:');
-    console.log(JSON.stringify(body, null, 2));
-
+    console.log('[webhook] Incoming webhook body:', JSON.stringify(body, null, 2));
     res.sendStatus(200);
 
     try {
@@ -55,16 +50,16 @@ router.post('/', async (req, res) => {
             const timestamp = event.timestamp || null;
 
             if (event.message?.is_echo) {
-                console.log('[webhook] Skipping echo message');
+                console.log('[webhook] skipping echo message');
                 continue;
             }
 
             if (!event.message) {
-                console.log('[webhook] No event.message, skipping save');
+                console.log('[webhook] event has no event.message, skipping saveMessage');
                 continue;
             }
 
-            console.log('[webhook] About to save message mid:', event.message.mid || null);
+            console.log('[webhook] calling saveMessage for mid:', event.message.mid || null);
 
             const saved = await saveMessage({
                 senderId,
@@ -75,14 +70,15 @@ router.post('/', async (req, res) => {
                 rawPayload: event,
             });
 
-            console.log('[webhook] saveMessage result:', saved ? saved.id : null);
+            console.log('[webhook] saveMessage returned:', saved ? saved.id : null);
 
             if (senderId && event.message.text) {
+                console.log('[webhook] calling handleIncomingMessage');
                 await handleIncomingMessage(senderId, event.message.text);
             }
         }
     } catch (error) {
-        console.error('[webhook] POST error:', error.message);
+        console.error('[webhook] POST /webhook error:', error.message);
         console.error(error.stack);
     }
 });

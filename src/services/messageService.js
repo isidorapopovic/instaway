@@ -9,7 +9,7 @@ async function saveMessage({
     rawPayload = null,
 }) {
     if (!mid) {
-        console.warn('[messageService] Missing mid, skipping insert');
+        console.warn('[messageService] Missing message mid, skipping insert');
         return null;
     }
 
@@ -40,14 +40,14 @@ async function saveMessage({
         const result = await db.query(sql, values);
 
         if (result.rows.length === 0) {
-            console.log('[messageService] Message already exists, skipped:', mid);
+            console.log('[messageService] Message already exists or was skipped:', mid);
             return null;
         }
 
-        console.log('[messageService] Inserted message:', result.rows[0].id);
+        console.log('[messageService] Inserted row id:', result.rows[0].id);
         return result.rows[0];
     } catch (err) {
-        console.error('[messageService] Failed to insert message:', err.message);
+        console.error('[messageService] saveMessage failed:', err.message);
         throw err;
     }
 }
