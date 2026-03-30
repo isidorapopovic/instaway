@@ -9,7 +9,7 @@ async function saveMessage({
     rawPayload = null,
 }) {
     if (!mid) {
-        console.warn('[messageService] Skipping insert because message_mid is missing');
+        console.warn('[messageService] Missing mid, skipping insert');
         return null;
     }
 
@@ -22,7 +22,7 @@ async function saveMessage({
       event_timestamp,
       raw_payload
     )
-    VALUES ($1, $2, $3, $4, $5, $6)
+    VALUES ($1, $2, $3, $4, $5, $6::jsonb)
     ON CONFLICT (message_mid) DO NOTHING
     RETURNING *;
   `;
@@ -33,21 +33,21 @@ async function saveMessage({
         text,
         mid,
         timestamp,
-        rawPayload ? JSON.stringify(rawPayload) : null,
+        JSON.stringify(rawPayload || {}),
     ];
 
     try {
         const result = await db.query(sql, values);
 
         if (result.rows.length === 0) {
-            console.log('[messageService] Message already existed, nothing inserted:', mid);
+            console.log('[messageService] Message already exists, skipped:', mid);
             return null;
         }
 
-        console.log('[messageService] Inserted message row:', result.rows[0]);
+        console.log('[messageService] Inserted message:', result.rows[0].id);
         return result.rows[0];
     } catch (err) {
-        console.error('[messageService] saveMessage failed:', err.message);
+        console.error('[messageService] Failed to insert message:', err.message);
         throw err;
     }
 }

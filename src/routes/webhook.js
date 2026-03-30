@@ -12,39 +12,12 @@ function extractMessagingEvents(body) {
     }
 
     for (const entry of body.entry) {
-        // Standard Messenger / Instagram Messaging webhook shape
-        if (Array.isArray(entry.messaging)) {
-            for (const event of entry.messaging) {
-                events.push(event);
-            }
+        if (!Array.isArray(entry.messaging)) {
+            continue;
         }
 
-        // Defensive fallback in case a different webhook structure is received
-        if (Array.isArray(entry.changes)) {
-            for (const change of entry.changes) {
-                const value = change?.value;
-
-                if (Array.isArray(value?.messaging)) {
-                    for (const event of value.messaging) {
-                        events.push(event);
-                    }
-                }
-
-                if (Array.isArray(value?.messages)) {
-                    for (const msg of value.messages) {
-                        events.push({
-                            sender: { id: value?.from?.id || value?.sender?.id || null },
-                            recipient: { id: value?.to?.id || value?.recipient?.id || null },
-                            timestamp: value?.timestamp || msg?.timestamp || null,
-                            message: {
-                                mid: msg?.id || msg?.mid || null,
-                                text: msg?.text || null,
-                            },
-                            rawChange: change,
-                        });
-                    }
-                }
-            }
+        for (const event of entry.messaging) {
+            events.push(event);
         }
     }
 
@@ -57,7 +30,7 @@ router.get('/', (req, res) => {
     const challenge = req.query['hub.challenge'];
 
     if (mode === 'subscribe' && token === process.env.META_VERIFY_TOKEN) {
-        console.log('[webhook] Verified');
+        console.log('[webhook] Verified.');
         return res.status(200).send(challenge);
     }
 
@@ -70,65 +43,46 @@ router.post('/', async (req, res) => {
     console.log('[webhook] Incoming webhook body:');
     console.log(JSON.stringify(body, null, 2));
 
-    // Acknowledge Meta immediately
     res.sendStatus(200);
 
     try {
         const messagingEvents = extractMessagingEvents(body);
-        console.log(`[webhook] Extracted ${messagingEvents.length} messaging event(s)`);
-
-        if (messagingEvents.length === 0) {
-            console.warn('[webhook] No messaging events found in payload');
-            return;
-        }
+        console.log('[webhook] Extracted events:', messagingEvents.length);
 
         for (const event of messagingEvents) {
             const senderId = event.sender?.id || null;
             const recipientId = event.recipient?.id || null;
             const timestamp = event.timestamp || null;
-            const message = event.message || null;
 
-            if (!message) {
-                console.log('[webhook] Skipping event because event.message is missing');
-                continue;
-            }
-
-            if (message.is_echo) {
+            if (event.message?.is_echo) {
                 console.log('[webhook] Skipping echo message');
                 continue;
             }
 
-            if (senderId && recipientId && senderId === recipientId) {
-                console.log('[webhook] Skipping event because senderId === recipientId');
+            if (!event.message) {
+                console.log('[webhook] No event.message, skipping save');
                 continue;
             }
 
-            console.log('[webhook] About to save message:', {
-                mid: message.mid || null,
-                senderId,
-                recipientId,
-                text: message.text || null,
-                timestamp,
-            });
+            console.log('[webhook] About to save message mid:', event.message.mid || null);
 
             const saved = await saveMessage({
                 senderId,
                 recipientId,
-                text: message.text || null,
-                mid: message.mid || null,
+                text: event.message.text || null,
+                mid: event.message.mid || null,
                 timestamp,
                 rawPayload: event,
             });
 
             console.log('[webhook] saveMessage result:', saved ? saved.id : null);
 
-            if (senderId && message.text) {
-                console.log('[webhook] Passing text to handleIncomingMessage');
-                await handleIncomingMessage(senderId, message.text);
+            if (senderId && event.message.text) {
+                await handleIncomingMessage(senderId, event.message.text);
             }
         }
     } catch (error) {
-        console.error('[webhook] POST /webhook error:', error.message);
+        console.error('[webhook] POST error:', error.message);
         console.error(error.stack);
     }
 });
