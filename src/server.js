@@ -3,6 +3,8 @@ require('dotenv').config();
 const express = require('express');
 const webhookRoutes = require('./routes/webhook');
 const messagesRoutes = require('./routes/messages');
+const calendarRoutes = require('./routes/calendar');
+const inboxRoutes = require('./routes/inbox');
 const { initDb } = require('./db/initDb');
 
 const app = express();
@@ -12,6 +14,8 @@ app.use(express.json());
 
 app.use('/webhook', webhookRoutes);
 app.use('/messages', messagesRoutes);
+app.use('/calendar', calendarRoutes);
+app.use('/inbox', inboxRoutes);
 
 app.get('/', (req, res) => {
     res.send('instaway is running');

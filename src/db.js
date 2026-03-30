@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const connectionString = process.env.DATABASE_URL;
-const useSsl = process.env.PG_SSL === 'true';
+const useSsl = process.env.NODE_ENV === 'production' || process.env.PG_SSL === 'true';
 
 console.log('[db] DATABASE_URL exists:', !!connectionString);
 console.log('[db] PG_SSL:', process.env.PG_SSL);
