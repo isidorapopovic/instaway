@@ -13,7 +13,9 @@ function extractMessagingEvents(body) {
 
     for (const entry of body.entry) {
         if (!Array.isArray(entry.messaging)) continue;
-        for (const event of entry.messaging) events.push(event);
+        for (const event of entry.messaging) {
+            events.push(event);
+        }
     }
 
     return events;
@@ -34,42 +36,50 @@ router.get('/', (req, res) => {
 
 router.post('/', async (req, res) => {
     const body = req.body;
-    console.log('Incoming webhook body:', JSON.stringify(body, null, 2));
 
-    // Acknowledge immediately
+    console.log('[webhook] Incoming webhook body:', JSON.stringify(body, null, 2));
     res.sendStatus(200);
 
     try {
         const messagingEvents = extractMessagingEvents(body);
+        console.log('[webhook] Extracted events:', messagingEvents.length);
 
         for (const event of messagingEvents) {
             const senderId = event.sender?.id || null;
             const recipientId = event.recipient?.id || null;
             const timestamp = event.timestamp || null;
 
-            // Skip echo messages (sent by the page itself)
-            if (event.message?.is_echo) continue;
-            if (senderId && recipientId && senderId === recipientId) continue;
+            if (event.message?.is_echo) {
+                console.log('[webhook] skipping echo message');
+                continue;
+            }
 
-            // 1. Always save the raw message to the DB (existing behaviour)
-            await saveMessage({
+            if (!event.message) {
+                console.log('[webhook] event has no event.message, skipping saveMessage');
+                continue;
+            }
+
+            console.log('[webhook] calling saveMessage for mid:', event.message.mid || null);
+
+            const saved = await saveMessage({
                 senderId,
                 recipientId,
-                text: event.message?.text || null,
-                mid: event.message?.mid || null,
+                text: event.message.text || null,
+                mid: event.message.mid || null,
                 timestamp,
-                rawPayload: event
+                rawPayload: event,
             });
 
-            // 2. If it's a text message from a real user, run the scheduling handler
-            if (senderId && event.message?.text) {
-                handleIncomingMessage(senderId, event.message.text).catch(err =>
-                    console.error('[webhook] handleIncomingMessage error:', err.message)
-                );
+            console.log('[webhook] saveMessage returned:', saved ? saved.id : null);
+
+            if (senderId && event.message.text) {
+                console.log('[webhook] calling handleIncomingMessage');
+                await handleIncomingMessage(senderId, event.message.text);
             }
         }
     } catch (error) {
-        console.error('POST /webhook error:', error);
+        console.error('[webhook] POST /webhook error:', error.message);
+        console.error(error.stack);
     }
 });
 

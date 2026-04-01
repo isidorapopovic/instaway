@@ -3,13 +3,6 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-console.log('Google client present:', {
-    clientId: !!process.env.GOOGLE_CLIENT_ID,
-    clientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-    refreshToken: !!process.env.GOOGLE_REFRESH_TOKEN,
-    calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary'
-});
-
 function getCalendarClient() {
     if (
         !process.env.GOOGLE_CLIENT_ID ||
@@ -25,19 +18,22 @@ function getCalendarClient() {
     );
 
     oauth2Client.setCredentials({
-        refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
     });
 
     return google.calendar({ version: 'v3', auth: oauth2Client });
 }
 
-// ---------------------------------------------------------------------------
-// Existing function (unchanged)
-// ---------------------------------------------------------------------------
+const WORK_START_HOUR = Number(process.env.WORK_START_HOUR || 9);
+const WORK_END_HOUR = Number(process.env.WORK_END_HOUR || 18);
+const SLOT_DURATION_MINUTES = Number(process.env.SLOT_DURATION_MINUTES || 60);
+const SEARCH_DAYS_AHEAD = Number(process.env.SEARCH_DAYS_AHEAD || 7);
+const MAX_SLOTS_TO_OFFER = Number(process.env.MAX_SLOTS_TO_OFFER || 5);
+const TIMEZONE = process.env.TIMEZONE || 'Europe/Belgrade';
 
 async function getUpcomingEvents({
     calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary',
-    maxResults = 10
+    maxResults = 10,
 } = {}) {
     const calendar = getCalendarClient();
 
@@ -46,26 +42,11 @@ async function getUpcomingEvents({
         timeMin: new Date().toISOString(),
         maxResults,
         singleEvents: true,
-        orderBy: 'startTime'
+        orderBy: 'startTime',
     });
 
     return response.data.items || [];
 }
-
-// ---------------------------------------------------------------------------
-// Scheduling automation – configuration
-// Adjust these to match your working hours and treatment length.
-// ---------------------------------------------------------------------------
-
-const WORK_START_HOUR = 9;    // 09:00
-const WORK_END_HOUR = 18;   // 18:00
-const SLOT_DURATION_MINUTES = 60;  // 1-hour treatments
-const SEARCH_DAYS_AHEAD = 7;    // look 7 days into the future
-const MAX_SLOTS_TO_OFFER = 5;    // max options shown to the user
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function generateCandidateSlots() {
     const slots = [];
@@ -75,7 +56,9 @@ function generateCandidateSlots() {
         const day = new Date(now);
         day.setDate(now.getDate() + d);
 
-        if (day.getDay() === 0) continue; // skip Sundays
+        if (day.getDay() === 0) {
+            continue;
+        }
 
         for (let h = WORK_START_HOUR; h < WORK_END_HOUR; h++) {
             const slot = new Date(day);
@@ -83,44 +66,71 @@ function generateCandidateSlots() {
             slots.push(slot);
         }
     }
+
     return slots;
 }
 
+function getSlotEnd(slotStart) {
+    return new Date(
+        new Date(slotStart).getTime() + SLOT_DURATION_MINUTES * 60_000
+    );
+}
+
+function overlaps(slotStart, slotEnd, busyStart, busyEnd) {
+    return slotStart < busyEnd && slotEnd > busyStart;
+}
+
 function isSlotBusy(slotStart, busyPeriods) {
-    const slotEnd = new Date(slotStart.getTime() + SLOT_DURATION_MINUTES * 60_000);
+    const start = new Date(slotStart);
+    const end = getSlotEnd(start);
 
     return busyPeriods.some(({ start, end }) => {
         const busyStart = new Date(start);
         const busyEnd = new Date(end);
-        return slotStart < busyEnd && slotEnd > busyStart;
+        return overlaps(start, end, busyStart, busyEnd);
     });
 }
 
-// ---------------------------------------------------------------------------
-// New scheduling functions
-// ---------------------------------------------------------------------------
-
-/**
- * Returns up to MAX_SLOTS_TO_OFFER free slots from Google Calendar.
- * @returns {Promise<Date[]>}
- */
-async function getAvailableSlots() {
+async function getBusyPeriods({
+    timeMin,
+    timeMax,
+    calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary',
+}) {
     const calendar = getCalendarClient();
-    const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
-
-    const now = new Date();
-    const end = new Date(now);
-    end.setDate(now.getDate() + SEARCH_DAYS_AHEAD);
 
     const response = await calendar.freebusy.query({
         requestBody: {
-            timeMin: now.toISOString(),
-            timeMax: end.toISOString(),
+            timeMin: new Date(timeMin).toISOString(),
+            timeMax: new Date(timeMax).toISOString(),
             items: [{ id: calendarId }],
         },
     });
 
-    const busyPeriods = response.data.calendars[calendarId]?.busy || [];
+    return response.data.calendars[calendarId]?.busy || [];
+}
+
+async function isSlotStillAvailable(slotStart) {
+    const start = new Date(slotStart);
+    const end = getSlotEnd(start);
+
+    const busyPeriods = await getBusyPeriods({
+        timeMin: start,
+        timeMax: end,
+    });
+
+    return !isSlotBusy(start, busyPeriods);
+}
+
+async function getAvailableSlots() {
+    const now = new Date();
+    const end = new Date(now);
+    end.setDate(now.getDate() + SEARCH_DAYS_AHEAD);
+
+    const busyPeriods = await getBusyPeriods({
+        timeMin: now,
+        timeMax: end,
+    });
+
     const candidates = generateCandidateSlots();
 
     return candidates
@@ -128,43 +138,37 @@ async function getAvailableSlots() {
         .slice(0, MAX_SLOTS_TO_OFFER);
 }
 
-/**
- * Creates a calendar event for a confirmed booking.
- * @param {{ startTime: Date, clientName: string, instagramUserId: string }} params
- * @returns {Promise<string>} HTML link to the created event
- */
 async function createBookingEvent({ startTime, clientName, instagramUserId }) {
     const calendar = getCalendarClient();
     const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
-
-    const endTime = new Date(startTime.getTime() + SLOT_DURATION_MINUTES * 60_000);
+    const endTime = getSlotEnd(startTime);
 
     const event = await calendar.events.insert({
         calendarId,
         requestBody: {
             summary: `Treatment – ${clientName}`,
-            description: `Booked via Instagram DM. Instagram user ID: ${instagramUserId}`,
+            description: `Booked via Instagram DM.\nInstagram user ID: ${instagramUserId}`,
             start: {
-                dateTime: startTime.toISOString(),
-                timeZone: process.env.TIMEZONE || 'Europe/Belgrade',
+                dateTime: new Date(startTime).toISOString(),
+                timeZone: TIMEZONE,
             },
             end: {
                 dateTime: endTime.toISOString(),
-                timeZone: process.env.TIMEZONE || 'Europe/Belgrade',
+                timeZone: TIMEZONE,
             },
         },
     });
 
     console.log(`[googleCalendarService] Event created: ${event.data.htmlLink}`);
-    return event.data.htmlLink;
+
+    return {
+        id: event.data.id,
+        htmlLink: event.data.htmlLink,
+        startTime: new Date(startTime),
+        endTime,
+    };
 }
 
-/**
- * Formats a Date into a readable string for DM messages.
- * Example: "Monday, 31 Mar at 10:00"
- * @param {Date|string} date
- * @returns {string}
- */
 function formatSlot(date) {
     return new Date(date).toLocaleString('en-GB', {
         weekday: 'long',
@@ -172,13 +176,15 @@ function formatSlot(date) {
         month: 'short',
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: process.env.TIMEZONE || 'Europe/Belgrade',
+        timeZone: TIMEZONE,
     });
 }
 
 module.exports = {
-    getUpcomingEvents,       // existing
-    getAvailableSlots,       // new
-    createBookingEvent,      // new
-    formatSlot,              // new
+    getUpcomingEvents,
+    getAvailableSlots,
+    createBookingEvent,
+    formatSlot,
+    isSlotStillAvailable,
+    getSlotEnd,
 };
