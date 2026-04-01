@@ -17,6 +17,8 @@ const {
     buildConfirmationMessage,
     buildNoSlotsMessage,
     buildInvalidChoiceMessage,
+    buildGeneralBookingHelpMessage,
+    buildSlotTakenMessage,
 } = require('../services/instagramService');
 
 const SCHEDULING_KEYWORDS = [
@@ -43,24 +45,58 @@ const SCHEDULING_KEYWORDS = [
     'dolazak',
 ];
 
+const RESET_KEYWORDS = [
+    'reset',
+    'start over',
+    'start again',
+    'book again',
+    'new booking',
+    'cancel',
+    'cancel booking',
+    'ponovo',
+    'ispočetka',
+    'ispocetka',
+];
+
+function normaliseText(text) {
+    return String(text || '').trim();
+}
+
 function isSchedulingIntent(text) {
-    const lower = text.toLowerCase();
+    const lower = normaliseText(text).toLowerCase();
     return SCHEDULING_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function isResetIntent(text) {
+    const lower = normaliseText(text).toLowerCase();
+    return RESET_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+async function safeSendMessage(userId, text) {
+    try {
+        return await sendMessage(userId, text);
+    } catch (err) {
+        if (err.code === 'IG_TOKEN_INVALID') {
+            console.error(
+                `[messageHandler] Cannot send message to ${userId}: Instagram token expired or invalid`
+            );
+            return null;
+        }
+
+        throw err;
+    }
 }
 
 async function handleIdle(userId, text) {
     if (!isSchedulingIntent(text)) {
-        await sendMessage(
-            userId,
-            "Hi! I can help with bookings. Send a message like 'book an appointment' or 'when is your next free slot?'."
-        );
+        await safeSendMessage(userId, buildGeneralBookingHelpMessage());
         return;
     }
 
     const slots = await getAvailableSlots();
 
-    if (slots.length === 0) {
-        await sendMessage(userId, buildNoSlotsMessage());
+    if (!slots || slots.length === 0) {
+        await safeSendMessage(userId, buildNoSlotsMessage());
         return;
     }
 
@@ -71,15 +107,28 @@ async function handleIdle(userId, text) {
         offeredSlots: slots.map(s => (s instanceof Date ? s.toISOString() : s)),
     });
 
-    await sendMessage(userId, buildSlotOfferMessage(slotLabels));
+    await safeSendMessage(userId, buildSlotOfferMessage(slotLabels));
 }
 
 async function handleAwaitingSlotChoice(userId, text, conversation) {
-    const offeredSlots = conversation.offered_slots || [];
-    const choice = parseInt(text.trim(), 10);
+    const offeredSlots = conversation?.offered_slots || [];
 
-    if (isNaN(choice) || choice < 1 || choice > offeredSlots.length) {
-        await sendMessage(userId, buildInvalidChoiceMessage(offeredSlots.length));
+    if (!offeredSlots.length) {
+        console.warn(
+            `[messageHandler] No offered slots stored for ${userId}, resetting conversation.`
+        );
+        await deleteConversation(userId);
+        await safeSendMessage(
+            userId,
+            "I couldn't find your offered slots any more, so I've reset the conversation. Send a booking message and I'll show you the latest availability."
+        );
+        return;
+    }
+
+    const choice = parseInt(normaliseText(text), 10);
+
+    if (Number.isNaN(choice) || choice < 1 || choice > offeredSlots.length) {
+        await safeSendMessage(userId, buildInvalidChoiceMessage(offeredSlots.length));
         return;
     }
 
@@ -92,15 +141,15 @@ async function handleAwaitingSlotChoice(userId, text, conversation) {
         selectedSlot,
     });
 
-    await sendMessage(userId, buildAskNameMessage(slotLabel));
+    await safeSendMessage(userId, buildAskNameMessage(slotLabel));
 }
 
 async function handleAwaitingName(userId, text, conversation) {
-    const clientName = text.trim();
-    const selectedSlot = conversation.selected_slot;
+    const clientName = normaliseText(text);
+    const selectedSlot = conversation?.selected_slot;
 
     if (!clientName || clientName.length < 2) {
-        await sendMessage(
+        await safeSendMessage(
             userId,
             'Could you share your full name so I can confirm the booking?'
         );
@@ -110,7 +159,7 @@ async function handleAwaitingName(userId, text, conversation) {
     if (!selectedSlot) {
         console.error(`[messageHandler] Missing selectedSlot for ${userId}, resetting.`);
         await deleteConversation(userId);
-        await sendMessage(
+        await safeSendMessage(
             userId,
             "Something went wrong on my end. Let's start over — send 'book an appointment' and I'll show you the next slots."
         );
@@ -127,19 +176,23 @@ async function handleAwaitingName(userId, text, conversation) {
         });
     } catch (err) {
         console.error('[messageHandler] Failed to create calendar event:', err.message);
-        await sendMessage(
-            userId,
-            "I'm sorry, I had trouble saving your booking right now. Please try again in a moment."
-        );
+
+        const message = /taken|exists|conflict|busy|overlap/i.test(err.message)
+            ? buildSlotTakenMessage()
+            : "I'm sorry, I had trouble saving your booking right now. Please try again in a moment.";
+
+        await safeSendMessage(userId, message);
         return;
     }
 
-    await sendMessage(userId, buildConfirmationMessage(clientName, slotLabel));
+    await safeSendMessage(userId, buildConfirmationMessage(clientName, slotLabel));
     await deleteConversation(userId);
 }
 
 async function handleIncomingMessage(userId, text) {
-    if (!text || !text.trim()) return;
+    const cleanText = normaliseText(text);
+
+    if (!cleanText) return;
 
     let conversation;
 
@@ -147,38 +200,68 @@ async function handleIncomingMessage(userId, text) {
         conversation = await getConversation(userId);
     } catch (err) {
         console.error('[messageHandler] DB error:', err.message);
-        await sendMessage(
-            userId,
-            "I'm having a temporary database issue at the moment. Please try again shortly."
-        );
+
+        try {
+            await safeSendMessage(
+                userId,
+                "I'm having a temporary database issue at the moment. Please try again shortly."
+            );
+        } catch (_) { }
+
+        return;
+    }
+
+    if (isResetIntent(cleanText)) {
+        try {
+            await deleteConversation(userId);
+            await safeSendMessage(
+                userId,
+                "I've reset our conversation. Send a booking message whenever you're ready and I'll show you the next available slots."
+            );
+        } catch (err) {
+            console.error(`[messageHandler] Reset failed for user ${userId}:`, err.message);
+        }
         return;
     }
 
     const state = conversation?.state || 'idle';
 
-    console.log(`[messageHandler] user=${userId} state=${state} text="${text.substring(0, 60)}"`);
+    console.log(
+        `[messageHandler] user=${userId} state=${state} text="${cleanText.substring(0, 60)}"`
+    );
 
     try {
         switch (state) {
             case 'idle':
-                await handleIdle(userId, text);
+                await handleIdle(userId, cleanText);
                 break;
+
             case 'awaiting_slot_choice':
-                await handleAwaitingSlotChoice(userId, text, conversation);
+                await handleAwaitingSlotChoice(userId, cleanText, conversation);
                 break;
+
             case 'awaiting_name':
-                await handleAwaitingName(userId, text, conversation);
+                await handleAwaitingName(userId, cleanText, conversation);
                 break;
+
             default:
                 console.warn(`[messageHandler] Unknown state "${state}", resetting.`);
                 await deleteConversation(userId);
-                await handleIdle(userId, text);
+                await handleIdle(userId, cleanText);
                 break;
         }
     } catch (err) {
+        if (err.code === 'IG_TOKEN_INVALID') {
+            console.error(
+                `[messageHandler] Stopping reply flow for user ${userId}: Instagram token expired or invalid`
+            );
+            return;
+        }
+
         console.error(`[messageHandler] Error for user ${userId}:`, err.message);
+
         try {
-            await sendMessage(
+            await safeSendMessage(
                 userId,
                 "Something went wrong while processing your message. Please try again."
             );

@@ -3,42 +3,71 @@ const axios = require('axios');
 const GRAPH_API_BASE = 'https://graph.facebook.com/v19.0';
 
 async function sendMessage(recipientId, text) {
+    const token = process.env.IG_ACCESS_TOKEN;
+    const igAccountId = process.env.IG_ACCOUNT_ID;
+
+    console.log('[instagramService] token exists:', !!token);
+    console.log('[instagramService] recipientId:', recipientId);
+    console.log('[instagramService] text:', text);
+
+    if (!recipientId) {
+        throw new Error('recipientId is required');
+    }
+
+    if (!text || !text.trim()) {
+        throw new Error('text is required');
+    }
+
+    if (!token) {
+        throw new Error('IG_ACCESS_TOKEN is missing from environment variables');
+    }
+
+    if (!igAccountId) {
+        throw new Error('IG_ACCOUNT_ID is missing from environment variables');
+    }
+
     try {
-        const token = process.env.IG_ACCESS_TOKEN;
-
-        console.log('[instagramService] token exists:', !!token);
-        console.log(
-            '[instagramService] token preview:',
-            token ? `${token.slice(0, 12)}...` : 'MISSING'
-        );
-        console.log('[instagramService] recipientId:', recipientId);
-        console.log('[instagramService] text:', text);
-
-        if (!token) {
-            throw new Error('IG_ACCESS_TOKEN is missing from environment variables');
-        }
-
-        const igAccountId = process.env.IG_ACCOUNT_ID;
-        if (!igAccountId) {
-            throw new Error('IG_ACCOUNT_ID is missing from environment variables');
-        }
-
         const response = await axios.post(
             `${GRAPH_API_BASE}/${igAccountId}/messages`,
             {
                 recipient: { id: recipientId },
-                message: { text },
+                message: { text: text.trim() },
             },
             {
                 params: { access_token: token },
+                timeout: 10000,
             }
         );
 
         console.log('[instagramService] Meta response:', response.data);
         console.log(`[instagramService] Sent message to ${recipientId}`);
+        return response.data;
     } catch (err) {
-        const detail = err.response?.data || err.message;
-        console.error('[instagramService] Failed to send message:', detail);
+        const metaError = err.response?.data?.error;
+
+        if (metaError) {
+            console.error('[instagramService] Meta API error:', {
+                message: metaError.message,
+                type: metaError.type,
+                code: metaError.code,
+                error_subcode: metaError.error_subcode,
+                fbtrace_id: metaError.fbtrace_id,
+            });
+
+            if (metaError.code === 190) {
+                const tokenError = new Error('Instagram access token expired or invalid');
+                tokenError.code = 'IG_TOKEN_INVALID';
+                tokenError.meta = metaError;
+                throw tokenError;
+            }
+
+            const apiError = new Error(metaError.message || 'Instagram API request failed');
+            apiError.code = 'IG_API_ERROR';
+            apiError.meta = metaError;
+            throw apiError;
+        }
+
+        console.error('[instagramService] Request failed:', err.message);
         throw err;
     }
 }
