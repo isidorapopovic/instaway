@@ -54,7 +54,7 @@ async function sendMessage(recipientId, text) {
                 fbtrace_id: metaError.fbtrace_id,
             });
 
-            if (metaError.code === 190) {
+            if (metaError.code === 190 || metaError.error_subcode === 463) {
                 const tokenError = new Error('Instagram access token expired or invalid');
                 tokenError.code = 'IG_TOKEN_INVALID';
                 tokenError.meta = metaError;

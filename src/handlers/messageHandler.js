@@ -37,6 +37,22 @@ const RESET_KEYWORDS = [
     'ispocetka',
 ];
 
+const GREETINGS = [
+    'hi',
+    'hello',
+    'helo',
+    'hey',
+    'hii',
+    'yo',
+    'zdravo',
+    'cao',
+    'ćaо',
+    'caoo',
+    'dobar dan',
+    'good morning',
+    'good evening',
+];
+
 function normaliseText(text) {
     return String(text || '').trim();
 }
@@ -44,6 +60,16 @@ function normaliseText(text) {
 function isResetIntent(text) {
     const lower = normaliseText(text).toLowerCase();
     return RESET_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function isGreeting(text) {
+    const lower = normaliseText(text).toLowerCase();
+    return GREETINGS.includes(lower);
+}
+
+function isQuotaError(err) {
+    const msg = String(err?.message || '').toLowerCase();
+    return err?.status === 429 || err?.code === 429 || msg.includes('exceeded your current quota');
 }
 
 async function safeSendMessage(userId, text) {
@@ -67,7 +93,9 @@ function buildSystemPrompt(conversation) {
     const selectedSlot = conversation?.selected_slot || null;
 
     const offeredSlotsText = offeredSlots.length
-        ? offeredSlots.map((slot, idx) => `${idx + 1}. ${formatSlot(slot)} | ${new Date(slot).toISOString()}`).join('\n')
+        ? offeredSlots
+            .map((slot, idx) => `${idx + 1}. ${formatSlot(slot)} | ${new Date(slot).toISOString()}`)
+            .join('\n')
         : 'None';
 
     const selectedSlotText = selectedSlot
@@ -105,8 +133,10 @@ ${selectedSlotText}
 Interpretation hints:
 - "first", "1", "the first one", "number 1" all mean choiceNumber=1
 - "second", "2", "the second one" all mean choiceNumber=2
+- "third", "3", "the third one" all mean choiceNumber=3
 - If state=awaiting_name and the message looks like a person's name, call create_booking_from_selected_slot
 - If state=idle and the user asks for booking/availability, call get_available_slots
+- If the user only sends a greeting, reply politely and offer booking help
 `.trim();
 }
 
@@ -121,17 +151,17 @@ const tools = [
                 properties: {
                     date: {
                         type: 'string',
-                        description: 'Optional date in YYYY-MM-DD format if the user specified a date.'
+                        description: 'Optional date in YYYY-MM-DD format if the user specified a date.',
                     },
                     period: {
                         type: 'string',
                         enum: ['morning', 'afternoon', 'evening'],
-                        description: 'Optional time-of-day preference.'
-                    }
+                        description: 'Optional time-of-day preference.',
+                    },
                 },
-                additionalProperties: false
-            }
-        }
+                additionalProperties: false,
+            },
+        },
     },
     {
         type: 'function',
@@ -143,13 +173,13 @@ const tools = [
                 properties: {
                     choiceNumber: {
                         type: 'integer',
-                        minimum: 1
-                    }
+                        minimum: 1,
+                    },
                 },
                 required: ['choiceNumber'],
-                additionalProperties: false
-            }
-        }
+                additionalProperties: false,
+            },
+        },
     },
     {
         type: 'function',
@@ -161,13 +191,13 @@ const tools = [
                 properties: {
                     clientName: {
                         type: 'string',
-                        description: 'The user full name.'
-                    }
+                        description: 'The user full name.',
+                    },
                 },
                 required: ['clientName'],
-                additionalProperties: false
-            }
-        }
+                additionalProperties: false,
+            },
+        },
     },
     {
         type: 'function',
@@ -177,9 +207,9 @@ const tools = [
             parameters: {
                 type: 'object',
                 properties: {},
-                additionalProperties: false
-            }
-        }
+                additionalProperties: false,
+            },
+        },
     },
     {
         type: 'function',
@@ -189,9 +219,9 @@ const tools = [
             parameters: {
                 type: 'object',
                 properties: {},
-                additionalProperties: false
-            }
-        }
+                additionalProperties: false,
+            },
+        },
     },
     {
         type: 'function',
@@ -203,13 +233,13 @@ const tools = [
                 properties: {
                     newSlotIso: {
                         type: 'string',
-                        description: 'The new slot start time in ISO 8601 format.'
-                    }
+                        description: 'The new slot start time in ISO 8601 format.',
+                    },
                 },
                 required: ['newSlotIso'],
-                additionalProperties: false
-            }
-        }
+                additionalProperties: false,
+            },
+        },
     },
     {
         type: 'function',
@@ -219,10 +249,10 @@ const tools = [
             parameters: {
                 type: 'object',
                 properties: {},
-                additionalProperties: false
-            }
-        }
-    }
+                additionalProperties: false,
+            },
+        },
+    },
 ];
 
 function parseToolArgs(toolCall) {
@@ -248,7 +278,6 @@ async function runModel(messages) {
 
 async function executeToolCall(userId, conversation, toolCall) {
     const args = parseToolArgs(toolCall);
-    const state = conversation?.state || 'idle';
     const offeredSlots = conversation?.offered_slots || [];
     const selectedSlot = conversation?.selected_slot || null;
 
@@ -272,7 +301,7 @@ async function executeToolCall(userId, conversation, toolCall) {
                     ok: true,
                     action: 'get_available_slots',
                     slots: [],
-                    text: "There are no available slots at the moment.",
+                    text: 'There are no available slots at the moment.',
                 };
             }
 
@@ -487,6 +516,20 @@ async function handleIncomingMessage(userId, text) {
         return;
     }
 
+    if (
+        conversation &&
+        ['awaiting_slot_choice', 'awaiting_name'].includes(conversation.state) &&
+        isGreeting(cleanText)
+    ) {
+        try {
+            await deleteConversation(userId);
+            conversation = null;
+            console.log(`[messageHandler] Reset stale conversation for user ${userId} after greeting`);
+        } catch (err) {
+            console.error(`[messageHandler] Failed to reset stale conversation for ${userId}:`, err.message);
+        }
+    }
+
     if (isResetIntent(cleanText)) {
         try {
             await deleteConversation(userId);
@@ -529,7 +572,6 @@ async function handleIncomingMessage(userId, text) {
                 try {
                     toolResult = await executeToolCall(userId, conversation, toolCall);
 
-                    // refresh conversation after each tool call in case state changed
                     conversation = await getConversation(userId);
                 } catch (toolErr) {
                     console.error(
@@ -560,9 +602,22 @@ async function handleIncomingMessage(userId, text) {
 
         await safeSendMessage(userId, reply);
     } catch (err) {
+        if (isQuotaError(err)) {
+            console.error(`[messageHandler] OpenAI quota error for user ${userId}:`, err.message);
+
+            try {
+                await safeSendMessage(
+                    userId,
+                    "My booking assistant is temporarily unavailable. Please try again a little later."
+                );
+            } catch (_) { }
+
+            return;
+        }
+
         if (err.code === 'IG_TOKEN_INVALID') {
             console.error(
-                `[messageHandler] Stopping reply flow for user ${userId}: Instagram token expired or invalid`
+                `[messageHandler] Cannot reply to ${userId}: Instagram token expired or invalid`
             );
             return;
         }
