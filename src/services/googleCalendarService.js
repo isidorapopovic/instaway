@@ -3,6 +3,13 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
+const WORK_START_HOUR = Number(process.env.WORK_START_HOUR || 9);
+const WORK_END_HOUR = Number(process.env.WORK_END_HOUR || 18);
+const SLOT_DURATION_MINUTES = Number(process.env.SLOT_DURATION_MINUTES || 60);
+const SEARCH_DAYS_AHEAD = Number(process.env.SEARCH_DAYS_AHEAD || 7);
+const MAX_SLOTS_TO_OFFER = Number(process.env.MAX_SLOTS_TO_OFFER || 5);
+const TIMEZONE = process.env.TIMEZONE || 'Europe/Belgrade';
+
 function getCalendarClient() {
     if (
         !process.env.GOOGLE_CLIENT_ID ||
@@ -14,7 +21,8 @@ function getCalendarClient() {
 
     const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI || undefined
     );
 
     oauth2Client.setCredentials({
@@ -24,56 +32,12 @@ function getCalendarClient() {
     return google.calendar({ version: 'v3', auth: oauth2Client });
 }
 
-const WORK_START_HOUR = Number(process.env.WORK_START_HOUR || 9);
-const WORK_END_HOUR = Number(process.env.WORK_END_HOUR || 18);
-const SLOT_DURATION_MINUTES = Number(process.env.SLOT_DURATION_MINUTES || 60);
-const SEARCH_DAYS_AHEAD = Number(process.env.SEARCH_DAYS_AHEAD || 7);
-const MAX_SLOTS_TO_OFFER = Number(process.env.MAX_SLOTS_TO_OFFER || 5);
-const TIMEZONE = process.env.TIMEZONE || 'Europe/Belgrade';
-
-async function getUpcomingEvents({
-    calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary',
-    maxResults = 10,
-} = {}) {
-    const calendar = getCalendarClient();
-
-    const response = await calendar.events.list({
-        calendarId,
-        timeMin: new Date().toISOString(),
-        maxResults,
-        singleEvents: true,
-        orderBy: 'startTime',
-    });
-
-    return response.data.items || [];
-}
-
-function generateCandidateSlots() {
-    const slots = [];
-    const now = new Date();
-
-    for (let d = 1; d <= SEARCH_DAYS_AHEAD; d++) {
-        const day = new Date(now);
-        day.setDate(now.getDate() + d);
-
-        if (day.getDay() === 0) {
-            continue;
-        }
-
-        for (let h = WORK_START_HOUR; h < WORK_END_HOUR; h++) {
-            const slot = new Date(day);
-            slot.setHours(h, 0, 0, 0);
-            slots.push(slot);
-        }
-    }
-
-    return slots;
+function getCalendarId() {
+    return process.env.GOOGLE_CALENDAR_ID || 'primary';
 }
 
 function getSlotEnd(slotStart) {
-    return new Date(
-        new Date(slotStart).getTime() + SLOT_DURATION_MINUTES * 60_000
-    );
+    return new Date(new Date(slotStart).getTime() + SLOT_DURATION_MINUTES * 60_000);
 }
 
 function overlaps(slotStart, slotEnd, busyStart, busyEnd) {
@@ -91,10 +55,65 @@ function isSlotBusy(slotStart, busyPeriods) {
     });
 }
 
+function parseDateOnly(dateStr) {
+    if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+    return new Date(`${dateStr}T00:00:00`);
+}
+
+function getHoursForPeriod(period) {
+    switch (period) {
+        case 'morning':
+            return { startHour: 9, endHour: 12 };
+        case 'afternoon':
+            return { startHour: 12, endHour: 17 };
+        case 'evening':
+            return { startHour: 17, endHour: WORK_END_HOUR };
+        default:
+            return { startHour: WORK_START_HOUR, endHour: WORK_END_HOUR };
+    }
+}
+
+function generateCandidateSlots({ date, period } = {}) {
+    const slots = [];
+    const now = new Date();
+    const targetDate = parseDateOnly(date);
+    const { startHour, endHour } = getHoursForPeriod(period);
+
+    const datesToCheck = [];
+
+    if (targetDate) {
+        datesToCheck.push(targetDate);
+    } else {
+        for (let d = 1; d <= SEARCH_DAYS_AHEAD; d++) {
+            const day = new Date(now);
+            day.setDate(now.getDate() + d);
+            datesToCheck.push(day);
+        }
+    }
+
+    for (const day of datesToCheck) {
+        const dayCopy = new Date(day);
+
+        // Skip Sundays
+        if (dayCopy.getDay() === 0) continue;
+
+        for (let h = startHour; h < endHour; h++) {
+            const slot = new Date(dayCopy);
+            slot.setHours(h, 0, 0, 0);
+
+            if (slot > now) {
+                slots.push(slot);
+            }
+        }
+    }
+
+    return slots.sort((a, b) => a - b);
+}
+
 async function getBusyPeriods({
     timeMin,
     timeMax,
-    calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary',
+    calendarId = getCalendarId(),
 }) {
     const calendar = getCalendarClient();
 
@@ -102,11 +121,12 @@ async function getBusyPeriods({
         requestBody: {
             timeMin: new Date(timeMin).toISOString(),
             timeMax: new Date(timeMax).toISOString(),
+            timeZone: TIMEZONE,
             items: [{ id: calendarId }],
         },
     });
 
-    return response.data.calendars[calendarId]?.busy || [];
+    return response.data.calendars?.[calendarId]?.busy || [];
 }
 
 async function isSlotStillAvailable(slotStart) {
@@ -121,35 +141,63 @@ async function isSlotStillAvailable(slotStart) {
     return !isSlotBusy(start, busyPeriods);
 }
 
-async function getAvailableSlots() {
-    const now = new Date();
-    const end = new Date(now);
-    end.setDate(now.getDate() + SEARCH_DAYS_AHEAD);
+async function getAvailableSlots({ date, period, limit = MAX_SLOTS_TO_OFFER } = {}) {
+    const candidates = generateCandidateSlots({ date, period });
 
-    const busyPeriods = await getBusyPeriods({
-        timeMin: now,
-        timeMax: end,
-    });
+    if (!candidates.length) return [];
 
-    const candidates = generateCandidateSlots();
+    const timeMin = candidates[0];
+    const timeMax = getSlotEnd(candidates[candidates.length - 1]);
+
+    const busyPeriods = await getBusyPeriods({ timeMin, timeMax });
 
     return candidates
         .filter(slot => !isSlotBusy(slot, busyPeriods))
-        .slice(0, MAX_SLOTS_TO_OFFER);
+        .slice(0, limit);
+}
+
+async function getUpcomingEvents({
+    calendarId = getCalendarId(),
+    maxResults = 10,
+} = {}) {
+    const calendar = getCalendarClient();
+
+    const response = await calendar.events.list({
+        calendarId,
+        timeMin: new Date().toISOString(),
+        maxResults,
+        singleEvents: true,
+        orderBy: 'startTime',
+    });
+
+    return response.data.items || [];
 }
 
 async function createBookingEvent({ startTime, clientName, instagramUserId }) {
     const calendar = getCalendarClient();
-    const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
-    const endTime = getSlotEnd(startTime);
+    const calendarId = getCalendarId();
+    const start = new Date(startTime);
+    const endTime = getSlotEnd(start);
+
+    const available = await isSlotStillAvailable(start);
+    if (!available) {
+        throw new Error('Selected slot is already taken');
+    }
 
     const event = await calendar.events.insert({
         calendarId,
         requestBody: {
             summary: `Treatment – ${clientName}`,
             description: `Booked via Instagram DM.\nInstagram user ID: ${instagramUserId}`,
+            extendedProperties: {
+                private: {
+                    instagramUserId: String(instagramUserId),
+                    clientName: String(clientName),
+                    source: 'instagram-dm',
+                },
+            },
             start: {
-                dateTime: new Date(startTime).toISOString(),
+                dateTime: start.toISOString(),
                 timeZone: TIMEZONE,
             },
             end: {
@@ -164,8 +212,122 @@ async function createBookingEvent({ startTime, clientName, instagramUserId }) {
     return {
         id: event.data.id,
         htmlLink: event.data.htmlLink,
-        startTime: new Date(startTime),
+        startTime: start,
         endTime,
+    };
+}
+
+function bookingBelongsToUser(event, instagramUserId) {
+    const fromExtended =
+        event?.extendedProperties?.private?.instagramUserId &&
+        String(event.extendedProperties.private.instagramUserId) === String(instagramUserId);
+
+    const fromDescription =
+        typeof event?.description === 'string' &&
+        event.description.includes(`Instagram user ID: ${instagramUserId}`);
+
+    return Boolean(fromExtended || fromDescription);
+}
+
+async function getUserUpcomingBookings({
+    instagramUserId,
+    maxResults = 20,
+    calendarId = getCalendarId(),
+} = {}) {
+    const calendar = getCalendarClient();
+
+    const response = await calendar.events.list({
+        calendarId,
+        timeMin: new Date().toISOString(),
+        maxResults,
+        singleEvents: true,
+        orderBy: 'startTime',
+    });
+
+    const items = response.data.items || [];
+
+    return items.filter(event => bookingBelongsToUser(event, instagramUserId));
+}
+
+async function cancelNextBookingForUser({ instagramUserId, calendarId = getCalendarId() }) {
+    const calendar = getCalendarClient();
+    const bookings = await getUserUpcomingBookings({ instagramUserId, maxResults: 10, calendarId });
+
+    if (!bookings.length) {
+        return { ok: false };
+    }
+
+    const nextBooking = bookings[0];
+
+    await calendar.events.delete({
+        calendarId,
+        eventId: nextBooking.id,
+    });
+
+    return {
+        ok: true,
+        cancelled: {
+            id: nextBooking.id,
+            start: nextBooking.start?.dateTime || nextBooking.start?.date,
+        },
+    };
+}
+
+async function rescheduleNextBookingForUser({
+    instagramUserId,
+    newStartTime,
+    calendarId = getCalendarId(),
+}) {
+    const calendar = getCalendarClient();
+    const bookings = await getUserUpcomingBookings({ instagramUserId, maxResults: 10, calendarId });
+
+    if (!bookings.length) {
+        return {
+            ok: false,
+            message: 'No upcoming booking was found.',
+        };
+    }
+
+    const newStart = new Date(newStartTime);
+
+    if (Number.isNaN(newStart.getTime())) {
+        return {
+            ok: false,
+            message: 'The new slot format is invalid.',
+        };
+    }
+
+    const available = await isSlotStillAvailable(newStart);
+
+    if (!available) {
+        return {
+            ok: false,
+            message: 'That new slot is not available.',
+        };
+    }
+
+    const booking = bookings[0];
+    const newEnd = getSlotEnd(newStart);
+
+    await calendar.events.patch({
+        calendarId,
+        eventId: booking.id,
+        requestBody: {
+            start: {
+                dateTime: newStart.toISOString(),
+                timeZone: TIMEZONE,
+            },
+            end: {
+                dateTime: newEnd.toISOString(),
+                timeZone: TIMEZONE,
+            },
+        },
+    });
+
+    return {
+        ok: true,
+        oldStart: booking.start?.dateTime || booking.start?.date,
+        newStart: newStart.toISOString(),
     };
 }
 
@@ -187,4 +349,7 @@ module.exports = {
     formatSlot,
     isSlotStillAvailable,
     getSlotEnd,
+    getUserUpcomingBookings,
+    cancelNextBookingForUser,
+    rescheduleNextBookingForUser,
 };
