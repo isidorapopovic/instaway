@@ -2,10 +2,6 @@ const axios = require('axios');
 
 const GRAPH_API_BASE = 'https://graph.facebook.com/v19.0';
 
-const axios = require('axios');
-
-const GRAPH_API_BASE = 'https://graph.facebook.com/v19.0';
-
 async function sendMessage(recipientId, text) {
     const token = process.env.IG_ACCESS_TOKEN;
     const pageId = process.env.FB_PAGE_ID;
