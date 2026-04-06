@@ -2,11 +2,16 @@ const axios = require('axios');
 
 const GRAPH_API_BASE = 'https://graph.facebook.com/v19.0';
 
+const axios = require('axios');
+
+const GRAPH_API_BASE = 'https://graph.facebook.com/v19.0';
+
 async function sendMessage(recipientId, text) {
     const token = process.env.IG_ACCESS_TOKEN;
-    const igAccountId = process.env.IG_ACCOUNT_ID;
+    const pageId = process.env.FB_PAGE_ID;
 
     console.log('[instagramService] token exists:', !!token);
+    console.log('[instagramService] pageId exists:', !!pageId);
     console.log('[instagramService] recipientId:', recipientId);
     console.log('[instagramService] text:', text);
 
@@ -22,13 +27,13 @@ async function sendMessage(recipientId, text) {
         throw new Error('IG_ACCESS_TOKEN is missing from environment variables');
     }
 
-    if (!igAccountId) {
-        throw new Error('IG_ACCOUNT_ID is missing from environment variables');
+    if (!pageId) {
+        throw new Error('FB_PAGE_ID is missing from environment variables');
     }
 
     try {
         const response = await axios.post(
-            `${GRAPH_API_BASE}/${igAccountId}/messages`,
+            `${GRAPH_API_BASE}/${pageId}/messages`,
             {
                 recipient: { id: recipientId },
                 message: { text: text.trim() },
