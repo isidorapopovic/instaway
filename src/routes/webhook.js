@@ -59,12 +59,17 @@ router.post('/', async (req, res) => {
                 continue;
             }
 
+            if (!event.message.text) {
+                console.log('[webhook] message has no text, skipping handler');
+                continue;
+            }
+
             console.log('[webhook] calling saveMessage for mid:', event.message.mid || null);
 
             const saved = await saveMessage({
                 senderId,
                 recipientId,
-                text: event.message.text || null,
+                text: event.message.text,
                 mid: event.message.mid || null,
                 timestamp,
                 rawPayload: event,
@@ -72,7 +77,12 @@ router.post('/', async (req, res) => {
 
             console.log('[webhook] saveMessage returned:', saved ? saved.id : null);
 
-            if (senderId && event.message.text) {
+            if (!saved) {
+                console.log('[webhook] duplicate message detected, skipping handler');
+                continue;
+            }
+
+            if (senderId) {
                 console.log('[webhook] calling handleIncomingMessage');
                 await handleIncomingMessage(senderId, event.message.text);
             }
@@ -82,5 +92,6 @@ router.post('/', async (req, res) => {
         console.error(error.stack);
     }
 });
+
 
 module.exports = router;
