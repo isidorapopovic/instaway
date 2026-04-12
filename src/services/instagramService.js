@@ -10,6 +10,11 @@ async function sendMessage(recipientId, text) {
     console.log('[instagramService] pageId exists:', !!pageId);
     console.log('[instagramService] recipientId:', recipientId);
     console.log('[instagramService] text:', text);
+    console.log('[instagramService] token exists:', !!token);
+    console.log('[instagramService] token prefix:', token ? token.slice(0, 10) : null);
+    console.log('[instagramService] token suffix:', token ? token.slice(-6) : null);
+    console.log('[instagramService] token length:', token ? token.length : 0);
+    console.log('[instagramService] token has spaces:', token ? /\s/.test(token) : false);
 
     if (!recipientId) {
         throw new Error('recipientId is required');
