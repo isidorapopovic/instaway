@@ -16,6 +16,7 @@ const {
     rescheduleNextBookingForUser,
 } = require('../services/googleCalendarService');
 
+const { saveBooking } = require('../services/bookingService');
 const { sendMessage } = require('../services/instagramService');
 
 const openai = new OpenAI({
@@ -390,12 +391,23 @@ async function executeToolCall(userId, conversation, toolCall) {
                 instagramUserId: userId,
             });
 
+            await saveBooking({
+                instagramUserId: userId,
+                clientName,
+                calendarEventId: booking.id,
+                calendarEventLink: booking.htmlLink || null,
+                startTime: booking.startTime || new Date(selectedSlot),
+                endTime: booking.endTime || null,
+                status: 'confirmed',
+            });
+
             await deleteConversation(userId);
 
             return {
                 ok: true,
                 action: 'create_booking_from_selected_slot',
                 bookingId: booking.id,
+                bookingLink: booking.htmlLink || null,
                 bookedSlotIso: new Date(selectedSlot).toISOString(),
                 bookedSlotLabel: formatSlot(selectedSlot),
                 clientName,
@@ -571,7 +583,6 @@ async function handleIncomingMessage(userId, text) {
 
                 try {
                     toolResult = await executeToolCall(userId, conversation, toolCall);
-
                     conversation = await getConversation(userId);
                 } catch (toolErr) {
                     console.error(
